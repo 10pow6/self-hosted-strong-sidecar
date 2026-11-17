@@ -5,6 +5,8 @@ deeper insight into the training data you already log there. Export your history
 drop it in a folder, and the sidecar gives you progress charts, data-quality review, training-program
 tracking, and a JSON API with a Claude skill that can plan your next session or help you break a plateau.
 
+![Progress tab: top set, estimated 1RM and volume for one exercise](docs/screenshots/progress.png)
+
 > **Unofficial project.** Self Hosted Strong Sidecar is an independent, community-built tool. It is
 > **not affiliated with, endorsed by, sponsored by, or connected to Strong or its developers.** It only
 > reads CSV files that you export from the app yourself. See [Disclaimers](#disclaimers).
@@ -105,6 +107,8 @@ Decisions are stored separately from the imported data, so they survive re-impor
 Detection thresholds can be tuned with env vars `STRONG_TOP_JUMP_PCT`, `STRONG_MEDIAN_JUMP_PCT`,
 `STRONG_JUMP_MIN` (in your display unit), `STRONG_BASELINE_SESSIONS`.
 
+![Review tab: flagged sessions with the reason and a decision for each](docs/screenshots/review.png)
+
 ## Programs
 
 Programs are JSON files in `programs/`. Edit them there, in the **Programs** tab, or via
@@ -127,6 +131,8 @@ tracks frequency against the program's, e1RM change since starting, and whether 
 It also shows the next prescribed sessions with weights. Without a fixed starting max, each session
 is compared against your best estimated 1RM from the 90 days before it.
 
+![Programs tab: a program's prescribed sets turned into weights for your current max](docs/screenshots/programs.png)
+
 ## Improvement plans
 
 A program is a generic template. An improvement plan is yours: a name ("Bench 100 → 110 kg (spring
@@ -141,6 +147,8 @@ target. After a test day, record the new max and every later week recalculates f
 
 Plans are usually created by the Claude skill (`POST /api/v1/plans`) once you agree to a plan it
 suggests. They're stored in the database, not in `programs/`, so they stay out of git.
+
+![Plans tab: goal, progress, phase timeline and the reasoning behind the plan](docs/screenshots/plans.png)
 
 ## API
 
@@ -174,6 +182,8 @@ adding endpoints. To regenerate the repo copy:
 The API has **no authentication**. It's meant for `127.0.0.1`. Don't expose it to a network you don't
 trust without putting authentication in front of it.
 
+![API & Skill tab: skill download, conventions and documented endpoints](docs/screenshots/api.png)
+
 ## Claude skill
 
 `.claude/skills/strong-coach/` is active automatically when using [Claude Code](https://claude.com/claude-code)
@@ -196,6 +206,7 @@ strong_app/      Python backend (FastAPI): import, analysis, programs, plans, AP
 web/             Vite + vanilla JS UI (yarn build → strong_app/static)
 programs/        Program definitions (JSON)
 .claude/skills/  The strong-coach Claude skill
+docs/screenshots/ README screenshots
 strong-extracts/ Your Strong CSV exports (git-ignored)
 data/            SQLite database (git-ignored)
 ```
