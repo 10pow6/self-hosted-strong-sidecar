@@ -11,6 +11,12 @@ tracking, and a JSON API with a Claude skill that can plan your next session or 
 > **not affiliated with, endorsed by, sponsored by, or connected to Strong or its developers.** It only
 > reads CSV files that you export from the app yourself. See [Disclaimers](#disclaimers).
 
+## Support
+
+If the sidecar saves you a few "why is my bench stuck?" hours and you'd like to chip in,
+pay-what-you-want via Stripe: https://buy.stripe.com/cN2dUh9Jw0b1eo8000. Entirely optional: the
+project is and stays MIT-licensed and self-hostable for free.
+
 ## Features
 
 - **Progress charts**: top set, estimated 1RM and volume per exercise over time, with session history.
