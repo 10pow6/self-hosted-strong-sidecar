@@ -85,6 +85,22 @@ CREATE TABLE IF NOT EXISTS program_assignments (
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Improvement plans: personal, dated, named plans (see plans.py). Personal data, so DB not git.
+CREATE TABLE IF NOT EXISTS improvement_plans (
+    id          INTEGER PRIMARY KEY,
+    name        TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'active'
+                CHECK (status IN ('draft','active','completed','abandoned')),
+    start_date  TEXT NOT NULL,
+    end_date    TEXT NOT NULL,
+    body        TEXT NOT NULL,          -- JSON: goal, targets, diagnosis, guardrails, notes, phases
+    maxes       TEXT NOT NULL,          -- JSON [{date, exercise, value_lb, note}] (canonical lb, as logged)
+    baseline    TEXT NOT NULL,          -- JSON {exercise: {...}} snapshot at creation (canonical lb)
+    author      TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 
 -- User preferences (JSON values), e.g. bar_tracking, bar_weight_lb.

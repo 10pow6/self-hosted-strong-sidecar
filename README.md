@@ -20,6 +20,9 @@ tracking, and a JSON API with a Claude skill that can plan your next session or 
 - **Training programs**: define programs as JSON (sets × reps × % of 1RM/training max), get concrete
   weights for your current max, and track adherence (prescribed vs. what you actually did, frequency,
   e1RM change, when a re-test is due).
+- **Improvement plans**: named, dated plans to break a plateau or reach a goal: the reasoning, phases
+  (deload, training blocks, test days) with concrete weights, guardrails, and progress against the goal.
+  Usually written by the Claude skill after looking at your data.
 - **Your conventions**: lb or kg, and whether your logged barbell weights include the bar.
 - **API + Claude skill**: an LLM-friendly JSON API (documented in-app) and a downloadable
   [Claude](https://claude.com/) skill for questions like *"what should my next bench session be?"*.
@@ -61,8 +64,9 @@ hidden, and a file already imported is skipped.
 ## Your data stays local
 
 Your data lives in `data/` (a SQLite database) and `strong-extracts/` (your CSV exports). Both are
-git-ignored, so they never end up in a commit. Program definitions in `programs/` and the skill in
-`.claude/skills/` are meant to be committed.
+git-ignored, so they never end up in a commit. That includes improvement plans, which are personal and
+stored in the database. Program definitions in `programs/` and the skill in `.claude/skills/` are meant
+to be committed.
 
 ## Settings
 
@@ -123,6 +127,21 @@ tracks frequency against the program's, e1RM change since starting, and whether 
 It also shows the next prescribed sessions with weights. Without a fixed starting max, each session
 is compared against your best estimated 1RM from the 90 days before it.
 
+## Improvement plans
+
+A program is a generic template. An improvement plan is yours: a name ("Bench 100 → 110 kg (spring
+block)"), a goal, why the plan looks the way it does (the diagnosis), rules for adjusting on the fly
+(guardrails), and dated phases such as a deload, a 4-week block and a test day. Each phase has week
+templates with concrete sets, written as a % of the plan's max (bar-aware, like programs), a fixed
+weight, or reps only.
+
+The **Plans** tab shows where you are today (phase, week and this week's sessions with weights), a
+timeline, each logged session against the plan day it matches, and progress from your baseline to the
+target. After a test day, record the new max and every later week recalculates from it.
+
+Plans are usually created by the Claude skill (`POST /api/v1/plans`) once you agree to a plan it
+suggests. They're stored in the database, not in `programs/`, so they stay out of git.
+
 ## API
 
 Weights are in your display units (see the `units` field). `{exercise}` is the exact Strong exercise
@@ -173,7 +192,7 @@ Claude and is handled under the terms of the Claude product you use.
 ## Project layout
 
 ```
-strong_app/      Python backend (FastAPI): import, analysis, programs, API, settings
+strong_app/      Python backend (FastAPI): import, analysis, programs, plans, API, settings
 web/             Vite + vanilla JS UI (yarn build → strong_app/static)
 programs/        Program definitions (JSON)
 .claude/skills/  The strong-coach Claude skill

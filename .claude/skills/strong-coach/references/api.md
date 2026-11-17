@@ -31,6 +31,7 @@ Returns:
 - routines_last_90d: workout names → count
 - recent_workouts[]: last 10 workouts with their exercises
 - pending_reviews: number of unreviewed flagged sessions
+- active_improvement_plans[]: id, name, goal, exercises, current_phase/week (check these first)
 - exercises[]: slug, sessions_total, last_date, days_since_last, sessions_last_30d/90d, current_top_weight, current_e1rm, best_e1rm, e1rm_trend_per_4wk_90d, pending_reviews
 
 Example: `curl -s 'http://127.0.0.1:8765/api/v1/overview'`
@@ -55,6 +56,7 @@ Returns:
 - recent_sessions[]: date, workout, compact sets string (e.g. '70x15, 120x8, 200x1'), top weight/reps, e1rm, volume
 - data_quality: pending reviews for this exercise, adjusted/excluded counts
 - how_to_read: plain-English explanation of the conventions
+- active_improvement_plans[]: active plans that include this exercise
 
 Example: `curl -s 'http://127.0.0.1:8765/api/v1/exercises/bench-press-barbell/coach-context?recent=8'`
 
@@ -283,6 +285,107 @@ Returns:
 Delete an assignment.
 
 Use for: Removing a mistaken entry.
+
+Returns:
+- {deleted}
+
+## Improvement plans
+
+### `GET /api/v1/plans`
+
+Your improvement plans: named, dated, personal plans (usually written by the coach skill).
+
+Use for: Checking whether the user is already on a plan before recommending anything.
+
+| Param | Type | Description |
+|---|---|---|
+| `status` | draft | active | completed | abandoned | Filter (default all) |
+| `as_of` | date | Reference date |
+
+Returns:
+- []: id, name, status, goal, exercises, start_date, end_date, current_phase, current_week, author, updated_at
+
+Example: `curl -s 'http://127.0.0.1:8765/api/v1/plans?status=active'`
+
+### `POST /api/v1/plans`
+
+Create an improvement plan (stored in the local DB, not in git).
+
+Use for: Saving a multi-week plan you recommended, after the user agrees. Sets reuse the program set format: `pct` of the plan's max for that exercise, or absolute `weight_lb`/`weight_kg`, or neither (reps only, e.g. bodyweight or 'pick a weight').
+
+| Param | Type | Description |
+|---|---|---|
+| `body` | JSON | {name, status?: active|draft, goal, targets {exercise: max}, maxes {exercise: starting max}? (display units, as logged; omitted = derived from best e1RM), diagnosis (markdown), guardrails [str], notes, phases [{name, kind: deload|block|test|peak|other, start_date, end_date, note?, progression?, weeks [{week, label?, days [{day, label?, note?, exercises [{exercise, note?, sets [{sets, reps, reps_max?, pct? | weight_lb?, warmup?, amrap?, note?}]}]}]}]}]}. A phase's last week template repeats if the phase is longer. |
+
+Returns:
+- The full plan (as GET /api/v1/plans/{pid})
+
+### `GET /api/v1/plans/{pid}`
+
+One plan in full, with concrete weights for every phase, week and day.
+
+Use for: Reading back exactly what was prescribed and why.
+
+| Param | Type | Description |
+|---|---|---|
+| `as_of` | date | Reference date |
+
+Returns:
+- summary fields + targets, diagnosis, guardrails, notes, maxes[] (date, exercise, value), baseline {exercise: best_e1rm_90d, heaviest_single, rep_max_5, ...} at creation
+- phases[]: name, kind, dates, progression, weeks[].days[].exercises[] with sets (weight as logged, actual_load, pct) and compact strings
+- definition: the raw plan JSON (for PATCH)
+
+Example: `curl -s 'http://127.0.0.1:8765/api/v1/plans/1'`
+
+### `GET /api/v1/plans/{pid}/progress`
+
+Where the user is in the plan and how it's going.
+
+Use for: Check-ins: 'what's today's session?', 'am I on track?', 'should I adjust?'.
+
+| Param | Type | Description |
+|---|---|---|
+| `as_of` | date | Reference date |
+
+Returns:
+- current: phase, week, this week's days with concrete weights; next_phase
+- exercises{}: sessions_logged, planned_in_completed_weeks, this_week {done, planned}, verdict_counts, as_prescribed_pct, sessions[] (prescribed vs actual + verdict)
+- goals[]: target, baseline_e1rm_90d, best_e1rm_since_start, heaviest_since_start, current_max, progress_pct
+- maxes[], guardrails[]
+
+Example: `curl -s 'http://127.0.0.1:8765/api/v1/plans/1/progress'`
+
+### `POST /api/v1/plans/{pid}/maxes`
+
+Record a new max (e.g. a test-day result); later prescriptions recalculate from it.
+
+Use for: After a test day, or when the user re-tests.
+
+| Param | Type | Description |
+|---|---|---|
+| `body` | JSON | {exercise, value (display units, as logged), date, note?} |
+
+Returns:
+- The full plan
+
+### `PATCH /api/v1/plans/{pid}`
+
+Edit a plan.
+
+Use for: Changing status (completed / abandoned), adjusting phases, goal, guardrails or notes.
+
+| Param | Type | Description |
+|---|---|---|
+| `body` | JSON | Any of {name, status, goal, targets, diagnosis, guardrails, notes, phases}; phases replaces the whole list |
+
+Returns:
+- The full plan
+
+### `DELETE /api/v1/plans/{pid}`
+
+Delete a plan.
+
+Use for: Removing a mistaken plan (prefer status=abandoned to keep history).
 
 Returns:
 - {deleted}

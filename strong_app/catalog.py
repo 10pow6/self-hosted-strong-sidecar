@@ -46,6 +46,7 @@ ENDPOINTS = [
             "routines_last_90d: workout names → count",
             "recent_workouts[]: last 10 workouts with their exercises",
             "pending_reviews: number of unreviewed flagged sessions",
+            "active_improvement_plans[]: id, name, goal, exercises, current_phase/week (check these first)",
             "exercises[]: slug, sessions_total, last_date, days_since_last, sessions_last_30d/90d, "
             "current_top_weight, current_e1rm, best_e1rm, e1rm_trend_per_4wk_90d, pending_reviews",
         ],
@@ -69,6 +70,7 @@ ENDPOINTS = [
             "top weight/reps, e1rm, volume",
             "data_quality: pending reviews for this exercise, adjusted/excluded counts",
             "how_to_read: plain-English explanation of the conventions",
+            "active_improvement_plans[]: active plans that include this exercise",
         ],
         "example": "/api/v1/exercises/bench-press-barbell/coach-context?recent=8",
     },
@@ -224,6 +226,77 @@ ENDPOINTS = [
     {
         "group": "Programs", "method": "DELETE", "path": "/api/v1/assignments/{aid}",
         "summary": "Delete an assignment.", "use_for": "Removing a mistaken entry.",
+        "params": [], "returns": ["{deleted}"], "example": None,
+    },
+    # ---- improvement plans ---------------------------------------------------
+    {
+        "group": "Improvement plans", "method": "GET", "path": "/api/v1/plans",
+        "summary": "Your improvement plans: named, dated, personal plans (usually written by the coach skill).",
+        "use_for": "Checking whether the user is already on a plan before recommending anything.",
+        "params": [["status", "draft | active | completed | abandoned", "Filter (default all)"],
+                   ["as_of", "date", "Reference date"]],
+        "returns": ["[]: id, name, status, goal, exercises, start_date, end_date, current_phase, current_week, "
+                    "author, updated_at"],
+        "example": "/api/v1/plans?status=active",
+    },
+    {
+        "group": "Improvement plans", "method": "POST", "path": "/api/v1/plans",
+        "summary": "Create an improvement plan (stored in the local DB, not in git).",
+        "use_for": "Saving a multi-week plan you recommended, after the user agrees. Sets reuse the program set "
+                   "format: `pct` of the plan's max for that exercise, or absolute `weight_lb`/`weight_kg`, "
+                   "or neither (reps only, e.g. bodyweight or 'pick a weight').",
+        "params": [["body", "JSON",
+                    "{name, status?: active|draft, goal, targets {exercise: max}, maxes {exercise: starting max}? "
+                    "(display units, as logged; omitted = derived from best e1RM), diagnosis (markdown), "
+                    "guardrails [str], notes, phases [{name, kind: deload|block|test|peak|other, start_date, "
+                    "end_date, note?, progression?, weeks [{week, label?, days [{day, label?, note?, exercises "
+                    "[{exercise, note?, sets [{sets, reps, reps_max?, pct? | weight_lb?, warmup?, amrap?, "
+                    "note?}]}]}]}]}]}. A phase's last week template repeats if the phase is longer."]],
+        "returns": ["The full plan (as GET /api/v1/plans/{pid})"], "example": None,
+    },
+    {
+        "group": "Improvement plans", "method": "GET", "path": "/api/v1/plans/{pid}",
+        "summary": "One plan in full, with concrete weights for every phase, week and day.",
+        "use_for": "Reading back exactly what was prescribed and why.",
+        "params": [["as_of", "date", "Reference date"]],
+        "returns": ["summary fields + targets, diagnosis, guardrails, notes, maxes[] (date, exercise, value), "
+                    "baseline {exercise: best_e1rm_90d, heaviest_single, rep_max_5, ...} at creation",
+                    "phases[]: name, kind, dates, progression, weeks[].days[].exercises[] with sets "
+                    "(weight as logged, actual_load, pct) and compact strings",
+                    "definition: the raw plan JSON (for PATCH)"],
+        "example": "/api/v1/plans/1",
+    },
+    {
+        "group": "Improvement plans", "method": "GET", "path": "/api/v1/plans/{pid}/progress",
+        "summary": "Where the user is in the plan and how it's going.",
+        "use_for": "Check-ins: 'what's today's session?', 'am I on track?', 'should I adjust?'.",
+        "params": [["as_of", "date", "Reference date"]],
+        "returns": ["current: phase, week, this week's days with concrete weights; next_phase",
+                    "exercises{}: sessions_logged, planned_in_completed_weeks, this_week {done, planned}, "
+                    "verdict_counts, as_prescribed_pct, sessions[] (prescribed vs actual + verdict)",
+                    "goals[]: target, baseline_e1rm_90d, best_e1rm_since_start, heaviest_since_start, "
+                    "current_max, progress_pct",
+                    "maxes[], guardrails[]"],
+        "example": "/api/v1/plans/1/progress",
+    },
+    {
+        "group": "Improvement plans", "method": "POST", "path": "/api/v1/plans/{pid}/maxes",
+        "summary": "Record a new max (e.g. a test-day result); later prescriptions recalculate from it.",
+        "use_for": "After a test day, or when the user re-tests.",
+        "params": [["body", "JSON", "{exercise, value (display units, as logged), date, note?}"]],
+        "returns": ["The full plan"], "example": None,
+    },
+    {
+        "group": "Improvement plans", "method": "PATCH", "path": "/api/v1/plans/{pid}",
+        "summary": "Edit a plan.",
+        "use_for": "Changing status (completed / abandoned), adjusting phases, goal, guardrails or notes.",
+        "params": [["body", "JSON", "Any of {name, status, goal, targets, diagnosis, guardrails, notes, phases}; "
+                                    "phases replaces the whole list"]],
+        "returns": ["The full plan"], "example": None,
+    },
+    {
+        "group": "Improvement plans", "method": "DELETE", "path": "/api/v1/plans/{pid}",
+        "summary": "Delete a plan.", "use_for": "Removing a mistaken plan (prefer status=abandoned to keep history).",
         "params": [], "returns": ["{deleted}"], "example": None,
     },
     # ---- review -------------------------------------------------------------

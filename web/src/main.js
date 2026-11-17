@@ -43,6 +43,7 @@ $$("nav button").forEach(b => b.onclick = () => {
   if (b.dataset.tab === "data") loadImports();
   if (b.dataset.tab === "api") loadApiDocs();
   if (b.dataset.tab === "programs") loadPrograms();
+  if (b.dataset.tab === "plans") loadPlans();
   if (b.dataset.tab === "settings") loadSettings();
 });
 const goTab = t => $(`nav button[data-tab="${t}"]`).click();
@@ -517,6 +518,155 @@ $("#progDelete").onclick = async () => {
   if (!slug || !confirm(`Delete program "${slug}"? This removes programs/${slug}.json.`)) return;
   try { await api(`/api/v1/programs/${slug}`, { method: "DELETE" }); toast("Deleted"); $("#progEditor").classList.add("hidden"); $("#progSelect").value = ""; loadPrograms(); }
   catch (e) { toast(e.message.includes("409") || e.message.includes("assignment") ? "In use by an assignment; end/delete that first" : "Delete failed"); }
+};
+
+// ---- improvement plans
+const PL = { list: [], id: +localGet("plan") || null, plan: null, prog: null };
+const VERDICT = { as_prescribed: "as prescribed", heavier: "heavier", lighter: "lighter", fewer_reps: "fewer reps",
+                  extra: "extra session", outside_phases: "between phases", logged: "logged" };
+// Tiny markdown: paragraphs, "- " bullets, **bold**, `code`.
+function mdLite(src) {
+  const inline = t => esc(t).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>");
+  let html = "", list = false;
+  for (const line of String(src || "").split("\n")) {
+    const li = line.match(/^\s*[-*] (.*)/);
+    if (li) { if (!list) { html += "<ul>"; list = true; } html += `<li>${inline(li[1])}</li>`; continue; }
+    if (list) { html += "</ul>"; list = false; }
+    if (line.trim()) html += `<p>${inline(line)}</p>`;
+  }
+  return html + (list ? "</ul>" : "");
+}
+const chipsFor = sets => `<span class="chips">${sets.map(s => `<span class="chip${s.warmup ? " wu" : ""}" title="${s.pct != null ? s.pct + "%" : ""}${s.actual_load ? ` · ${s.actual_load} ${U()} on the bar` : ""}${s.note ? " · " + esc(s.note) : ""}">${s.weight != null ? fmt(s.weight) + "×" : ""}${esc(s.reps)}${s.weight == null ? " reps" : ""}${s.pct != null ? `<small>${fmt(s.pct)}%</small>` : ""}</span>`).join("")}</span>`;
+const dayHtml = (d, doneLabel) => `<div class="day"><h3>${esc(d.label || "Day " + d.day)}${doneLabel ? `<span class="done">✓ ${esc(doneLabel)}</span>` : ""}</h3>
+  ${d.note ? `<p class="muted" style="font-size:12px;margin:0 0 4px">${esc(d.note)}</p>` : ""}
+  ${d.exercises.map(e => `<div class="dayex"><span class="lift">${esc(e.exercise)}</span>${chipsFor(e.sets)}
+    ${e.note ? `<span class="exnote">${esc(e.note)}</span>` : ""}</div>`).join("")}</div>`;
+
+async function loadPlans() {
+  PL.list = await api("/api/v1/plans");
+  const has = PL.list.length > 0;
+  $("#planEmpty").classList.toggle("hidden", has);
+  $("#planBody").classList.toggle("hidden", !has);
+  $$("#planComplete, #planAbandon, #planDelete, #planSelect, #planStatus").forEach(el => el.classList.toggle("hidden", !has));
+  if (!has) return;
+  if (!PL.list.some(p => p.id === PL.id)) PL.id = PL.list[0].id;
+  $("#planSelect").innerHTML = PL.list.map(p => `<option value="${p.id}">${esc(p.name)} · ${p.status}</option>`).join("");
+  $("#planSelect").value = PL.id;
+  await showPlan();
+}
+$("#planSelect").onchange = e => { PL.id = +e.target.value; localSet("plan", PL.id); showPlan(); };
+
+async function showPlan() {
+  const [plan, prog] = await Promise.all([api(`/api/v1/plans/${PL.id}`), api(`/api/v1/plans/${PL.id}/progress`)]);
+  PL.plan = plan; PL.prog = prog;
+  $$(".unit").forEach(el => el.textContent = U());
+  $("#planStatus").textContent = plan.status; $("#planStatus").className = "pill " + plan.status;
+  $("#planComplete").classList.toggle("hidden", plan.status === "completed");
+  $("#planAbandon").classList.toggle("hidden", plan.status === "abandoned");
+  $("#planName").textContent = plan.name;
+  $("#planGoal").textContent = plan.goal;
+  $("#planMeta").textContent = `${plan.start_date} → ${plan.end_date} · ${plan.exercises.join(", ")}` +
+    (plan.author ? ` · by ${plan.author}` : "") + ` · updated ${plan.updated_at}`;
+  renderPlanTiles(plan, prog);
+  renderTimeline(plan, prog);
+  renderPlanWeek(prog);
+  $("#planDiagnosis").innerHTML = mdLite(plan.diagnosis) || `<p class="muted">—</p>`;
+  $("#planGuardrails").innerHTML = plan.guardrails.map(g => `<li>${esc(g)}</li>`).join("") || `<li class="muted">—</li>`;
+  $("#planMaxes").innerHTML = plan.maxes.map(m => `<tr><td>${m.date}</td><td>${esc(m.exercise)}</td><td>${fmt(m.value)}</td><td class="muted">${esc(m.note || "")}</td></tr>`).join("");
+  const maxEx = [...new Set(plan.maxes.map(m => m.exercise))];
+  $("#pmExercise").innerHTML = maxEx.map(e => `<option>${esc(e)}</option>`).join("");
+  if (!$("#pmDate").value) $("#pmDate").value = new Date().toISOString().slice(0, 10);
+  const logEx = Object.keys(prog.exercises), keep = $("#planLogEx").value;
+  $("#planLogEx").innerHTML = logEx.map(e => `<option>${esc(e)}</option>`).join("");
+  $("#planLogEx").value = logEx.includes(keep) ? keep : logEx[0];
+  renderPlanLog();
+  $("#planMatchNote").textContent = prog.matching_note;
+  $("#planConvention").textContent = prog.convention + " Hover a set for % and the load on the bar.";
+  $("#planPhases").innerHTML = plan.phases.map((ph, i) => `<details class="phase" ${prog.current?.phase_index === i ? "open" : ""}>
+    <summary>${esc(ph.name)} <span class="muted" style="font-weight:400">· ${ph.kind} · ${ph.start_date} → ${ph.end_date}</span></summary>
+    ${ph.note ? `<p class="muted" style="font-size:13px">${esc(ph.note)}</p>` : ""}
+    ${ph.progression ? `<p style="font-size:13px"><b>Progression:</b> ${esc(ph.progression)}</p>` : ""}
+    ${ph.weeks.map(w => `<h3>${esc(w.label || "Week " + w.week)} <span class="muted" style="font-weight:400">· from ${w.starts}</span></h3>
+      ${w.days.map(d => dayHtml(d)).join("")}`).join("")}</details>`).join("");
+}
+
+function renderPlanTiles(plan, prog) {
+  const g = prog.goals[0], tiles = [];
+  if (g) {
+    const pct = Math.max(0, Math.min(100, g.progress_pct ?? 0));
+    tiles.push([`Goal · ${g.exercise}`, `${fmt(g.current_max)} → ${fmt(g.target)} ${U()}`,
+      `started at e1RM ${fmt(g.baseline_e1rm_90d)} · ${g.progress_pct ?? 0}% of the way`, `<div class="goalbar"><i style="width:${pct}%"></i></div>`]);
+    tiles.push(["Best since start", g.best_e1rm_since_start == null ? "—" : fmt(g.best_e1rm_since_start) + " " + U(),
+      g.best_e1rm_from ? "e1RM from " + g.best_e1rm_from : "no sessions yet"]);
+  }
+  const c = prog.current;
+  tiles.push(["Now", c ? `${c.phase} · wk ${c.week}/${c.weeks_in_phase}` : (prog.days_in < 0 ? "Not started" : "Between phases"),
+    c ? `ends ${c.phase_ends}` + (prog.next_phase ? ` · next: ${prog.next_phase.name}` : "") :
+        prog.next_phase ? `next: ${prog.next_phase.name} on ${prog.next_phase.starts}` : ""]);
+  const main = prog.exercises[plan.exercises[0]];
+  if (main) {
+    tiles.push(["This week", `${main.this_week.done} / ${main.this_week.planned}`, `${plan.exercises[0]} sessions done / planned`]);
+    tiles.push(["As prescribed", main.as_prescribed_pct == null ? "—" : main.as_prescribed_pct + "%",
+      Object.entries(main.verdict_counts).map(([k, v]) => `${VERDICT[k] || k} ${v}`).join(" · ") || "no sessions yet"]);
+  }
+  $("#planTiles").innerHTML = tiles.map(([k, v, sub, extra]) =>
+    `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="s">${esc(sub)}</div>${extra || ""}</div>`).join("");
+}
+
+function renderTimeline(plan, prog) {
+  const day = s => new Date(s + "T00:00:00").getTime();
+  const t0 = day(plan.start_date), t1 = day(plan.end_date) + 864e5, span = t1 - t0;
+  $("#planTimeline").innerHTML = plan.phases.map(ph => {
+    const w = (day(ph.end_date) + 864e5 - day(ph.start_date)) / span * 100;
+    return `<div class="seg ${ph.kind}" style="flex:0 0 ${w}%" title="${esc(ph.name)}: ${ph.start_date} → ${ph.end_date}">${esc(ph.name)}</div>`;
+  }).join("") + (() => {
+    const now = day(prog.as_of);
+    return now >= t0 && now < t1 ? `<div class="today" style="left:${(now - t0) / span * 100}%" title="Today ${prog.as_of}"></div>` : "";
+  })();
+  $("#planTimelineLegend").innerHTML = `<span>${plan.start_date}</span><span class="spacer"></span><span>today: ${prog.as_of}</span><span class="spacer"></span><span>${plan.end_date}</span>`;
+}
+
+function renderPlanWeek(prog) {
+  const c = prog.current;
+  if (!c) { $("#planWeekTitle").textContent = "This week"; $("#planWeekNote").textContent = prog.next_phase ? `Next: ${prog.next_phase.name} starts ${prog.next_phase.starts}.` : "The plan has ended."; $("#planWeek").innerHTML = ""; return; }
+  $("#planWeekTitle").textContent = `This week · ${c.phase}, week ${c.week} (from ${c.week_starts})`;
+  $("#planWeekNote").textContent = [c.note, c.progression && "Progression: " + c.progression].filter(Boolean).join(" ");
+  // A day is done when a session of the plan's main exercise this week was matched to it.
+  const ws = c.week_starts, we = new Date(new Date(ws + "T00:00:00").getTime() + 6 * 864e5).toISOString().slice(0, 10);
+  const done = {};
+  (prog.exercises[PL.plan.exercises[0]]?.sessions || []).forEach(s => {
+    if (s.date >= ws && s.date <= we && s.day && !done[s.day]) done[s.day] = s.date;
+  });
+  $("#planWeek").innerHTML = c.days.map(d => dayHtml(d, done[d.label || "Day " + d.day] && "done " + done[d.label || "Day " + d.day])).join("");
+}
+
+function renderPlanLog() {
+  const ex = PL.prog?.exercises[$("#planLogEx").value];
+  const rows = (ex?.sessions || []).slice().reverse();
+  $("#planLog").innerHTML = rows.length ? rows.map(r => `<tr><td>${r.date}</td>
+    <td>${r.phase ? esc(`${r.phase} · wk ${r.week}${r.day ? " · " + r.day : ""}`) : "—"}</td>
+    <td class="sets">${esc(r.prescribed || "")}</td><td class="sets">${esc(r.actual)}</td>
+    <td><span class="pill ${r.verdict}" title="${r.top_vs_prescribed_pct ? `top ${r.top_vs_prescribed_pct}% of prescribed · ${r.actual_working_reps}/${r.prescribed_working_reps} working reps` : ""}">${VERDICT[r.verdict] || r.verdict}</span></td></tr>`).join("")
+    : `<tr><td colspan="5" class="muted">No sessions logged in the plan yet. Import a new Strong export to see them here.</td></tr>`;
+}
+$("#planLogEx").onchange = renderPlanLog;
+
+async function setPlanStatus(status) {
+  await jsonPut(`/api/v1/plans/${PL.id}`, { status }, "PATCH"); toast("Plan " + status); loadPlans();
+}
+$("#planComplete").onclick = () => setPlanStatus("completed");
+$("#planAbandon").onclick = () => confirm("Mark this plan abandoned? (It's kept for history.)") && setPlanStatus("abandoned");
+$("#planDelete").onclick = async () => {
+  if (!confirm(`Delete “${PL.plan?.name}” permanently? Consider “Abandon” to keep its history.`)) return;
+  await api(`/api/v1/plans/${PL.id}`, { method: "DELETE" }); toast("Deleted"); PL.id = null; loadPlans();
+};
+$("#pmSave").onclick = async () => {
+  const value = +$("#pmValue").value;
+  if (!value) return toast("Enter the max");
+  try {
+    await jsonPut(`/api/v1/plans/${PL.id}/maxes`, { exercise: $("#pmExercise").value, value, date: $("#pmDate").value }, "POST");
+    toast("Max recorded; later weeks recalculated"); $("#pmValue").value = ""; $("#planMaxForm").open = false; showPlan();
+  } catch (e) { toast("Could not save: " + e.message.slice(0, 120)); }
 };
 
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", loadProgress);

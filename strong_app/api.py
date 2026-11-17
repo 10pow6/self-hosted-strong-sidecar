@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import analysis as A
+from . import plans as PL
 from . import programs as P
 from . import settings as S
 from .catalog import catalog, to_markdown
@@ -95,6 +96,8 @@ def overview(as_of: date | None = None):
                              "duration_min": w["duration_min"], "exercises": w["exercises"]}
                             for w in ws[-10:][::-1]],
         "pending_reviews": sum(1 for s in store.all_sessions() if s.status == "pending"),
+        "active_improvement_plans": [PL.summary(PL.load(conn, i), store, today)
+                                     for i in PL.list_ids(conn, "active")],
         "exercises": [A.exercise_summary(ex, ss, today) for ex, ss in store.by_exercise.items()],
     }
 
@@ -115,7 +118,9 @@ def coach_context(exercise: str, recent: int = Query(12, ge=1, le=100), as_of: d
     """Compact, LLM-ready picture of one exercise: records, rep maxes, progression/stall
     signals, frequency, last session and the last N sessions. Use this to plan the next session."""
     ex, ss = _exercise(exercise)
-    return A.coach_context(ex, ss, _today(as_of), recent)
+    today = _today(as_of)
+    return {**A.coach_context(ex, ss, today, recent),
+            "active_improvement_plans": PL.active_for(conn, store, ex, today)}
 
 
 @app.get("/api/v1/exercises/{exercise}/sessions", tags=["data"])
@@ -448,6 +453,79 @@ def program_context(exercise: str, program: str | None = None, since: date | Non
                        "ad-hoc comparison, or create an assignment (POST /api/v1/assignments).")
         out["available_programs"] = [P.program_summary(p) for p in P.list_programs()]
     return out
+
+
+# ---- improvement plans ---------------------------------------------------------
+def _plan(pid: int) -> dict:
+    p = PL.load(conn, pid)
+    if not p:
+        raise HTTPException(404, f"No improvement plan {pid}. See /api/v1/plans.")
+    return p
+
+
+@app.get("/api/v1/plans", tags=["plans"])
+def plans(status: Literal["draft", "active", "completed", "abandoned"] | None = None, as_of: date | None = None):
+    """Improvement plans (named, dated, personal plans, usually written by the coach skill)."""
+    store.refresh()
+    today = _today(as_of)
+    return [PL.summary(PL.load(conn, i), store, today) for i in PL.list_ids(conn, status)]
+
+
+@app.post("/api/v1/plans", tags=["plans"])
+def create_plan(p: PL.PlanIn, as_of: date | None = None):
+    """Create an improvement plan. Pct sets apply to the plan's max per exercise (from `maxes`,
+    or derived from your best e1RM). A baseline snapshot is taken now."""
+    store.refresh()
+    today = _today(as_of)
+    try:
+        pid = PL.create(conn, store, p, today)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return PL.full(_plan(pid), store, today)
+
+
+@app.get("/api/v1/plans/{pid}", tags=["plans"])
+def get_plan(pid: int, as_of: date | None = None):
+    """Full plan: goal, diagnosis, guardrails, maxes, baseline, and every phase/week/day with
+    concrete weights (each week uses the max in effect when it starts)."""
+    store.refresh()
+    return PL.full(_plan(pid), store, _today(as_of))
+
+
+@app.patch("/api/v1/plans/{pid}", tags=["plans"])
+def patch_plan(pid: int, p: PL.PlanPatch, as_of: date | None = None):
+    """Edit a plan: name, status, goal, targets, diagnosis, guardrails, notes, or replace phases."""
+    _plan(pid)
+    store.refresh()
+    try:
+        PL.patch(conn, store, pid, p)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return PL.full(_plan(pid), store, _today(as_of))
+
+
+@app.delete("/api/v1/plans/{pid}", tags=["plans"])
+def delete_plan(pid: int):
+    _plan(pid)
+    PL.delete(conn, pid)
+    return {"deleted": pid}
+
+
+@app.post("/api/v1/plans/{pid}/maxes", tags=["plans"])
+def add_plan_max(pid: int, m: PL.MaxIn, as_of: date | None = None):
+    """Record a new max (e.g. after a test day). Prescriptions from the day after use it."""
+    _plan(pid)
+    store.refresh()
+    PL.add_max(conn, store, pid, m)
+    return PL.full(_plan(pid), store, _today(as_of))
+
+
+@app.get("/api/v1/plans/{pid}/progress", tags=["plans"])
+def plan_progress(pid: int, as_of: date | None = None):
+    """Where you are in the plan: current phase/week with this week's sessions (concrete weights),
+    prescribed vs actual for every logged session, this week done/planned, and progress to goal."""
+    store.refresh()
+    return PL.progress(_plan(pid), store, _today(as_of))
 
 
 # ---- import / export ----------------------------------------------------------

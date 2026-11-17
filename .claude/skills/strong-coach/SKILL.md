@@ -1,6 +1,6 @@
 ---
 name: strong-coach
-description: Coach from the user's Strong workout history via the local Self Hosted Strong Sidecar API. Use when the user asks what to do next for a lift, whether to add weight, how an exercise is progressing, why they're stalling or how to break a plateau, or how they're doing on a training program (e.g. "I've been following X for bench, how do I break my plateau?"), or wants a program's sets turned into weights.
+description: Coach from the user's Strong workout history via the local Self Hosted Strong Sidecar API. Use when the user asks what to do next for a lift, whether to add weight, how an exercise is progressing, why they're stalling or how to break a plateau, or how they're doing on a training program (e.g. "I've been following X for bench, how do I break my plateau?"), or wants a program's sets turned into weights, wants a multi-week improvement plan saved, or asks how they're doing on their plan / what today's session is.
 ---
 
 # Strong coach
@@ -24,7 +24,7 @@ Full endpoint reference: `references/api.md` next to this file, or live at `$B/a
 ```bash
 B=${STRONG_API:-http://127.0.0.1:8765}
 curl -s $B/api/v1/settings                                   # bar convention: read this first
-curl -s $B/api/v1/overview                                   # routines, frequency, every exercise + trend
+curl -s $B/api/v1/overview                                   # routines, frequency, active plans, every exercise + trend
 curl -s "$B/api/v1/exercises/<slug>/coach-context?recent=12" # the main input for one exercise
 curl -s "$B/api/v1/exercises/<slug>/sessions?limit=20"       # full set-by-set detail if needed
 curl -s "$B/api/v1/workouts?limit=10"                        # what was trained recently (fatigue/overlap)
@@ -85,7 +85,39 @@ When the user mentions a program ("I've been following X"):
    variations, or switching programs (check what's in `/api/v1/programs`). Use
    `programs[].adherence.upcoming` or `/plan` for concrete weights.
 
-## 5. Recommend
+## 5. Improvement plans
+
+An improvement plan is a named, dated, personal plan (goal, diagnosis, guardrails, phases with
+concrete sets) stored in the sidecar's local DB. It sits above programs: programs are generic
+templates (`programs/*.json`, committed to git), plans are the user's own and never go in git.
+
+**Check first.** `overview.active_improvement_plans` and `coach-context.active_improvement_plans`
+list active plans. If one covers the exercise, start every check-in from it:
+```bash
+curl -s $B/api/v1/plans/<id>/progress   # current phase/week + this week's sessions, prescribed vs actual, goal progress
+curl -s $B/api/v1/plans/<id>            # full plan: diagnosis, guardrails, maxes, every phase with weights
+```
+Coach against the plan: today's session is in `current.days` (match it to what's already done this week in
+`exercises[<name>].this_week` / `sessions`). Apply its `guardrails` before improvising. Read verdicts honestly:
+`heavier` on a heavy day usually means the user went past the prescribed single.
+
+**Saving a plan.** When you recommend something multi-week (a block, a peak, a deload then retest), offer
+to save it as a plan. Only `POST /api/v1/plans` after the user agrees. Body (see `references/api.md`):
+- `name` (short, e.g. "Bench 100 → 110 kg (spring block)"), `goal` (one line with units), `targets`
+  {exercise: max}, `maxes` {exercise: starting max} (display units, as logged).
+- `diagnosis` (markdown: the numbers that justify the plan), `guardrails` (rules for adjusting), `notes`.
+- `phases`: contiguous, non-overlapping `{name, kind: deload|block|test|peak|other, start_date, end_date,
+  note, progression, weeks: [{week, label, days: [{day, label, note, exercises: [{exercise, note, sets}]}]}]}`.
+  A phase's last week repeats if it runs longer. Sets use the program set format: `pct` of the plan max
+  (bar-aware; prefer pct for barbell work so it recalculates after a test), `weight_lb`/`weight_kg` for fixed
+  loads (e.g. dumbbells), or neither for reps-only (bodyweight, "pick a weight"). Mark warm-ups `warmup: true`.
+- Use Strong exercise names from `overview.exercises`. Respect equipment limits the user mentioned.
+After posting, read back `GET /api/v1/plans/<id>` and check the concrete weights match what you told the user.
+
+**After a test day:** `POST /api/v1/plans/<id>/maxes` `{exercise, value, date}` (only with the user's OK);
+later weeks recalculate. Use `PATCH` for status (`completed`, `abandoned`) or to adjust phases.
+
+## 6. Recommend
 
 Give a concrete next session in the user's own format, e.g.
 
