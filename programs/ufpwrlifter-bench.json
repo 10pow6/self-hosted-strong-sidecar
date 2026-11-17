@@ -1,0 +1,89 @@
+{
+  "slug": "ufpwrlifter-bench",
+  "name": "UFPwrLifter Bench Press Program",
+  "description": "3 days/week bench specialization off your current 1RM: a ramp to a 96% single on Mon/Wed, a lighter 91% top on Friday, then back-off sets. Same week repeats; retest after at least 4 weeks.",
+  "source": "Long Nguyen (UFpwrLifter), Gravitus 2016; reposted https://ornatestrength.fitness.blog/2019/12/10/ufpwrlifter-bench-press-program/",
+  "lifts": {
+    "bench": "Bench Press (Barbell)",
+    "triceps": "Triceps Extension (Cable)",
+    "pullup": "Pull Up"
+  },
+  "basis": "1rm",
+  "training_max_pct": 100,
+  "rounding_lb": 5,
+  "min_weeks": 4,
+  "progression": "Run as written for at least 4 weeks. Then rest 4 days (skip Friday) and test a new 1RM the following Monday; recalculate all percentages from the new 1RM.",
+  "notes": "Original spreadsheet rounds to your smallest plate (example: 2.5 lb plates, i.e. 5 lb total steps). Friday is the lighter day (96% single removed). Accessories every day. The source does not specify rest periods or AMRAP sets. Triceps accessory in the source is Overhead Tricep Rope Extension. Edit `lifts` so each lift points at the exercise name you use in Strong.",
+  "weeks": [
+    {
+      "week": 1,
+      "days": [
+        {
+          "day": 1,
+          "label": "Monday",
+          "exercises": [
+            {
+              "lift": "bench",
+              "sets": [
+                {"sets": 1, "reps": 10, "pct": 33, "warmup": true},
+                {"sets": 1, "reps": 10, "pct": 56, "warmup": true},
+                {"sets": 1, "reps": 5, "pct": 79},
+                {"sets": 1, "reps": 3, "pct": 86},
+                {"sets": 1, "reps": 1, "pct": 91},
+                {"sets": 1, "reps": 1, "pct": 96},
+                {"sets": 2, "reps": 1, "pct": 91},
+                {"sets": 1, "reps": 3, "pct": 86},
+                {"sets": 1, "reps": 5, "pct": 79}
+              ]
+            },
+            {"lift": "triceps", "note": "Overhead Tricep Rope Extension", "sets": [{"sets": 3, "reps": 12, "reps_max": 15}]},
+            {"lift": "pullup", "note": "Bodyweight", "sets": [{"sets": 3, "reps": 12, "reps_max": 15}]}
+          ]
+        },
+        {
+          "day": 2,
+          "label": "Wednesday",
+          "exercises": [
+            {
+              "lift": "bench",
+              "sets": [
+                {"sets": 1, "reps": 10, "pct": 33, "warmup": true},
+                {"sets": 1, "reps": 10, "pct": 56, "warmup": true},
+                {"sets": 1, "reps": 5, "pct": 79},
+                {"sets": 1, "reps": 3, "pct": 86},
+                {"sets": 1, "reps": 1, "pct": 91},
+                {"sets": 1, "reps": 1, "pct": 96},
+                {"sets": 2, "reps": 1, "pct": 91},
+                {"sets": 1, "reps": 3, "pct": 86},
+                {"sets": 1, "reps": 5, "pct": 79}
+              ]
+            },
+            {"lift": "triceps", "note": "Overhead Tricep Rope Extension", "sets": [{"sets": 3, "reps": 12, "reps_max": 15}]},
+            {"lift": "pullup", "note": "Bodyweight", "sets": [{"sets": 3, "reps": 12, "reps_max": 15}]}
+          ]
+        },
+        {
+          "day": 3,
+          "label": "Friday (light)",
+          "exercises": [
+            {
+              "lift": "bench",
+              "sets": [
+                {"sets": 1, "reps": 10, "pct": 33, "warmup": true},
+                {"sets": 1, "reps": 10, "pct": 56, "warmup": true},
+                {"sets": 1, "reps": 5, "pct": 79},
+                {"sets": 1, "reps": 3, "pct": 86},
+                {"sets": 3, "reps": 1, "pct": 91},
+                {"sets": 1, "reps": 2, "pct": 86},
+                {"sets": 1, "reps": 4, "pct": 79},
+                {"sets": 1, "reps": 3, "pct": 79}
+              ]
+            },
+            {"lift": "triceps", "note": "Overhead Tricep Rope Extension", "sets": [{"sets": 3, "reps": 12, "reps_max": 15}]},
+            {"lift": "pullup", "note": "Bodyweight", "sets": [{"sets": 3, "reps": 12, "reps_max": 15}]}
+          ]
+        }
+      ]
+    }
+  ]
+}

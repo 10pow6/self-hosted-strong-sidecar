@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strong Sidecar</title>
+</head>
+<body>
+<header>
+  <h1>Strong Sidecar <span class="muted unofficial" title="Independent project, not affiliated with Strong">unofficial</span></h1>
+  <nav>
+    <button data-tab="progress" class="active">Progress</button>
+    <button data-tab="review">Review <span id="pendingBadge" class="badge hidden">0</span></button>
+    <button data-tab="programs">Programs</button>
+    <button data-tab="data">Data</button>
+    <button data-tab="api">API &amp; Skill</button>
+    <button data-tab="settings">Settings</button>
+  </nav>
+</header>
+
+<main>
+  <!-- PROGRESS -->
+  <section id="tab-progress">
+    <div class="row">
+      <select id="exSelect" aria-label="Exercise"></select>
+      <label class="muted"><input type="checkbox" id="activeOnly" checked> active (last 120 days)</label>
+      <div class="seg" id="range">
+        <button data-r="90">3M</button><button data-r="180">6M</button><button data-r="365" class="active">1Y</button><button data-r="0">All</button>
+      </div>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <div class="card">
+      <h2 id="mainTitle">Top set &amp; estimated 1RM</h2>
+      <div class="legend" id="mainLegend"></div>
+      <div class="chart-box"><canvas id="mainChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2 id="volTitle">Volume per session</h2>
+      <div class="chart-box small"><canvas id="volChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Sessions <span class="muted" id="sessCount" style="font-weight:400"></span></h2>
+      <div class="scroll tall">
+      <table><thead><tr><th>Date</th><th>Workout</th><th>Top</th><th>e1RM</th><th>Sets</th><th>Review</th></tr></thead>
+      <tbody id="sessTable"></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- REVIEW -->
+  <section id="tab-review" class="hidden">
+    <div class="card">
+      <h2>Suspicious jumps</h2>
+      <div class="muted" style="font-size:13px">Sessions where every set jumped versus your recent norm, or where the weights look like kg conversions (e.g. 176 / 198 / 209).
+        Mark <b>OK</b> if real. If the session was logged differently from your usual convention (see <a href="#settings" class="toSettings">Settings</a>),
+        pick <b>Bar included in log → subtract</b> or <b>Bar left out of log → add</b>; the bar amount (default: your Settings bar weight) is corrected so it's comparable.
+        <b>Exclude</b> for a different machine or bad data.</div>
+    </div>
+    <div class="row">
+      <div class="seg" id="revStatus"><button data-s="pending" class="active">Pending</button><button data-s="reviewed">Reviewed</button><button data-s="all">All</button></div>
+      <select id="revExercise"><option value="">All exercises</option></select>
+    </div>
+    <div class="card bulk row" id="bulkBar">
+      <span><b id="selCount">0</b> selected</span>
+      <select id="bulkStatus">
+        <option value="ok">OK (real)</option>
+        <option value="bar_included">Bar included in log → subtract</option>
+        <option value="bar_excluded">Bar left out of log → add</option>
+        <option value="exclude">Exclude</option>
+        <option value="pending">Clear decision</option>
+      </select>
+      <input id="bulkBar_lb" type="number" step="0.5" style="width:80px" title="bar weight to subtract/add"> <span class="muted"><span class="unit">lb</span> bar</span>
+      <button class="btn primary" id="bulkApply">Apply to selected</button>
+    </div>
+    <div class="card scroll">
+      <table><thead><tr><th><input type="checkbox" id="selAll"></th><th>Date</th><th>Exercise</th><th>Logged sets</th><th>Why flagged</th><th>Decision</th></tr></thead>
+      <tbody id="revTable"></tbody></table>
+    </div>
+  </section>
+
+  <!-- DATA -->
+  <section id="tab-data" class="hidden">
+    <div class="card">
+      <h2>Import a new Strong export</h2>
+      <p class="muted">Upload the CSV (or drop it into <code>strong-extracts/</code> and click Scan). Only new or changed workouts are applied.</p>
+      <div class="row"><input type="file" id="file" accept=".csv"><button class="btn primary" id="uploadBtn">Upload</button>
+        <button class="btn" id="scanBtn">Scan folder</button></div>
+      <pre id="importResult" class="muted" style="white-space:pre-wrap"></pre>
+    </div>
+    <div class="card scroll"><h2>Import history</h2>
+      <table><thead><tr><th>#</th><th>File</th><th>When</th><th>Workouts</th><th>New</th><th>Changed</th><th>Missing</th></tr></thead><tbody id="impTable"></tbody></table>
+    </div>
+    <div class="card"><h2>API</h2>
+      <p class="muted">Endpoint docs and the downloadable Claude skill are on the <a href="#api" id="toApi">API &amp; Skill</a> tab.</p>
+    </div>
+  </section>
+
+  <!-- PROGRAMS -->
+  <section id="tab-programs" class="hidden">
+    <div class="card">
+      <h2>Following</h2>
+      <div id="assignList" class="muted">Loading…</div>
+      <details id="assignForm">
+        <summary>Start following a program</summary>
+        <div class="row" style="margin-top:10px">
+          <label>Program <select id="afProgram"></select></label>
+          <label>Exercise <select id="afExercise"></select></label>
+          <label>Since <input id="afStart" type="date"></label>
+          <label>1RM / TM <input id="afBasis" type="number" step="0.5" style="width:90px" placeholder="auto"></label>
+          <input id="afNotes" placeholder="notes (optional)" style="min-width:180px">
+          <button class="btn primary" id="afSave">Start</button>
+        </div>
+        <p class="muted" style="font-size:12px;margin:4px 0 0">Start date can be in the past. Leave 1RM/TM empty to derive it from your best estimated 1RM before each session.</p>
+      </details>
+    </div>
+
+    <div class="row">
+      <select id="progSelect" aria-label="Program"></select>
+      <button class="btn" id="progEditBtn">Edit JSON</button>
+      <button class="btn" id="progNewBtn">New program</button>
+    </div>
+
+    <div class="card" id="progView"></div>
+
+    <div class="card hidden" id="progEditor">
+      <h2 id="progEditorTitle">Program JSON</h2>
+      <p class="muted" style="font-size:13px">Saved to <code>programs/&lt;slug&gt;.json</code>. Sets use <code>pct</code> (% of 1RM or training max) or an absolute <code>weight_lb</code> / <code>weight_kg</code>;
+        rounding is <code>rounding_lb</code> / <code>rounding_kg</code>;
+        <code>amrap</code>, <code>reps_max</code>, <code>rpe</code>, <code>warmup</code> are optional. <code>lifts</code> maps each lift key to your Strong exercise name.</p>
+      <textarea id="progJson" spellcheck="false"></textarea>
+      <pre id="progErr" class="code hidden"></pre>
+      <div class="row" style="margin-top:8px">
+        <button class="btn primary" id="progSave">Save</button>
+        <button class="btn" id="progCancel">Cancel</button>
+        <button class="btn danger" id="progDelete">Delete program</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="tab-settings" class="hidden">
+    <div class="card">
+      <h2>Units</h2>
+      <p class="muted">Which unit you use in Strong. Every weight in the app, the API and the Claude skill is shown in it.</p>
+      <div class="seg-radio">
+        <label class="radio"><input type="radio" name="units" value="lb"> <span><b>Pounds (lb)</b></span></label>
+        <label class="radio"><input type="radio" name="units" value="kg"> <span><b>Kilograms (kg)</b></span></label>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Bar convention</h2>
+      <p class="muted">How you enter barbell weights in Strong. It's used to turn program percentages into weights and as the default bar amount
+        when correcting a session in Review. Your logged data is never changed.</p>
+      <label class="radio"><input type="radio" name="barTracking" value="included">
+        <span><b>Include the bar</b>: I log the total load.</span></label>
+      <label class="radio"><input type="radio" name="barTracking" value="excluded">
+        <span><b>Exclude the bar</b>: I log only the weight I add.</span></label>
+      <p id="barExample" class="muted" style="font-size:13px;margin:4px 0 0 24px"></p>
+      <div class="row" style="margin-top:10px">
+        <label>Bar weight <input id="barWeight" type="number" step="0.5" min="0" max="100" style="width:80px"> <span class="formUnit">lb</span></label>
+        <span class="muted" style="font-size:13px">the bar you normally use</span>
+      </div>
+      <p id="settingsHint" class="muted" style="font-size:13px"></p>
+      <button class="btn primary" id="saveSettings">Save settings</button>
+    </div>
+  </section>
+
+  <!-- API & SKILL -->
+  <section id="tab-api" class="hidden">
+    <div class="card">
+      <h2>Claude skill: strong-coach</h2>
+      <p>Lets Claude read this API and suggest your next session for an exercise, e.g. <i>"what should my next bench session be?"</i>.
+        The zip contains <code>SKILL.md</code> (how to read your data and make a recommendation) and <code>references/api.md</code>
+        (every endpoint below), already pointed at <code id="skillBase"></code>.</p>
+      <div class="row">
+        <a class="btn primary" href="/api/v1/skill.zip" download>Download skill (.zip)</a>
+        <button class="btn" id="skillView">View SKILL.md</button>
+        <a class="btn" href="/api/v1/catalog" target="_blank">Catalog JSON</a>
+        <a class="btn" href="/docs" target="_blank">Interactive docs (Swagger)</a>
+      </div>
+      <pre id="skillText" class="code hidden"></pre>
+      <h3>Install</h3>
+      <ul class="install">
+        <li><b>Claude Code (recommended):</b> already active in this project (<code>.claude/skills/strong-coach</code>). To use it from any folder:
+          <pre class="code">unzip -o strong-coach.zip -d ~/.claude/skills/</pre></li>
+        <li><b>Claude apps (claude.ai / desktop):</b> upload the zip as a custom skill in Claude's settings.
+          <span class="muted">Skills there run in Anthropic's cloud sandbox, which can't reach <code>127.0.0.1</code>. They only work if this API is
+          reachable at a public URL. Download with that address baked in: <code>/api/v1/skill.zip?base_url=https://your-host</code>.</span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2>Conventions</h2>
+      <ul id="conventions" class="conv"></ul>
+    </div>
+    <div id="endpoints"></div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

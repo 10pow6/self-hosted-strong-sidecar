@@ -1,0 +1,27 @@
+# --- personal training data: never commit ---
+# SQLite database (imports, review decisions, program assignments)
+data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+# Strong CSV exports (keep the folder, not the files)
+strong-extracts/*
+!strong-extracts/.gitkeep
+*.csv
+
+# --- environments / build output ---
+.venv/
+__pycache__/
+*.pyc
+web/node_modules/
+web/dist/
+strong_app/static/
+.env
+
+# --- editor / OS ---
+.DS_Store
+.vscode/
+.idea/
+
+# Note: programs/*.json (program definitions) and .claude/skills/ ARE tracked.

@@ -1,0 +1,22 @@
+{
+  "slug": "wendler-531-bench",
+  "name": "Wendler 5/3/1 (bench main lift)",
+  "description": "4-week wave on a training max (90% of 1RM): 5s, 3s, 5/3/1, deload. Last working set each week is AMRAP. Bench once per week.",
+  "source": "Jim Wendler, 5/3/1 (main-lift percentages only; template for illustration)",
+  "lifts": {"bench": "Bench Press (Barbell)"},
+  "basis": "training_max",
+  "training_max_pct": 90,
+  "rounding_lb": 5,
+  "cycle_increment_lb": {"bench": 5},
+  "progression": "After each 4-week cycle add 5 lb to the bench training max. If the AMRAP set falls short of the prescribed reps, reset the training max lower.",
+  "weeks": [
+    {"week": 1, "label": "5s", "days": [{"day": 1, "exercises": [{"lift": "bench", "sets": [
+      {"reps": 5, "pct": 65}, {"reps": 5, "pct": 75}, {"reps": 5, "pct": 85, "amrap": true}]}]}]},
+    {"week": 2, "label": "3s", "days": [{"day": 1, "exercises": [{"lift": "bench", "sets": [
+      {"reps": 3, "pct": 70}, {"reps": 3, "pct": 80}, {"reps": 3, "pct": 90, "amrap": true}]}]}]},
+    {"week": 3, "label": "5/3/1", "days": [{"day": 1, "exercises": [{"lift": "bench", "sets": [
+      {"reps": 5, "pct": 75}, {"reps": 3, "pct": 85}, {"reps": 1, "pct": 95, "amrap": true}]}]}]},
+    {"week": 4, "label": "Deload", "days": [{"day": 1, "exercises": [{"lift": "bench", "sets": [
+      {"reps": 5, "pct": 40}, {"reps": 5, "pct": 50}, {"reps": 5, "pct": 60}]}]}]}
+  ]
+}
