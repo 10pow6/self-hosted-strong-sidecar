@@ -306,7 +306,14 @@ def _compare(presc: list[dict], s: A.Session, step: float) -> dict:
     p_min = min(p["weight"] for p in work)
     p_reps = sum(int(str(p["reps"]).split("-")[0].rstrip("+")) for p in work)
     act = [x for x in s.sets if x.weight > 0 and (x.reps or 0) > 0]
-    a_work = [x for x in act if x.weight >= p_min - step]
+    # Logged warm-ups aren't flagged, so skip the leading sets lighter than the first
+    # prescribed work set, at most as many as the warm-ups prescribed before it.
+    first_work = next(i for i, p in enumerate(presc) if not p.get("warmup") and p.get("weight"))
+    n_warm = sum(1 for p in presc[:first_work] if p.get("warmup"))
+    skip = 0
+    while skip < min(n_warm, len(act)) and act[skip].weight < presc[first_work]["weight"] - step:
+        skip += 1
+    a_work = [x for x in act[skip:] if x.weight >= p_min - step]
     a_top = max((x.weight for x in act), default=0)
     a_reps = sum(x.reps for x in a_work)
     ratio = a_top / p_top if p_top else 0
